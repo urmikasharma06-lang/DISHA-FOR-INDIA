@@ -1,11 +1,31 @@
 const authService = require('./auth.service');
+const { COOKIE_OPTIONS, MESSAGES } = require('./auth.constants');
 const { successResponse } = require('../../utils/response');
 
 class AuthController {
+  /**
+   * Helper to set refresh token in cookie.
+   */
+  #setRefreshTokenCookie(res, refreshToken) {
+    res.cookie('refreshToken', refreshToken, COOKIE_OPTIONS);
+  }
+
+  /**
+   * Helper to clear refresh token cookie.
+   */
+  #clearRefreshTokenCookie(res) {
+    res.clearCookie('refreshToken', {
+      httpOnly: COOKIE_OPTIONS.httpOnly,
+      secure: COOKIE_OPTIONS.secure,
+      sameSite: COOKIE_OPTIONS.sameSite,
+    });
+  }
+
   register = async (req, res, next) => {
     try {
-      const result = await authService.register(req.body);
-      return successResponse(res, 201, 'Register endpoint (Skeleton)', result);
+      const { user, accessToken, refreshToken } = await authService.register(req.body);
+      this.#setRefreshTokenCookie(res, refreshToken);
+      return successResponse(res, 201, MESSAGES.REGISTER_SUCCESS, { user, accessToken });
     } catch (error) {
       return next(error);
     }
@@ -13,8 +33,9 @@ class AuthController {
 
   login = async (req, res, next) => {
     try {
-      const result = await authService.login(req.body);
-      return successResponse(res, 200, 'Login endpoint (Skeleton)', result);
+      const { user, accessToken, refreshToken } = await authService.login(req.body);
+      this.#setRefreshTokenCookie(res, refreshToken);
+      return successResponse(res, 200, MESSAGES.LOGIN_SUCCESS, { user, accessToken });
     } catch (error) {
       return next(error);
     }
@@ -23,8 +44,9 @@ class AuthController {
   logout = async (req, res, next) => {
     try {
       const userId = req.user?.id;
-      const result = await authService.logout(userId);
-      return successResponse(res, 200, 'Logout endpoint (Skeleton)', result);
+      await authService.logout(userId);
+      this.#clearRefreshTokenCookie(res);
+      return successResponse(res, 200, MESSAGES.LOGOUT_SUCCESS);
     } catch (error) {
       return next(error);
     }
@@ -33,8 +55,9 @@ class AuthController {
   refreshToken = async (req, res, next) => {
     try {
       const token = req.cookies?.refreshToken || req.body.refreshToken;
-      const result = await authService.refreshToken(token);
-      return successResponse(res, 200, 'Refresh token endpoint (Skeleton)', result);
+      const { accessToken, refreshToken } = await authService.refreshToken(token);
+      this.#setRefreshTokenCookie(res, refreshToken);
+      return successResponse(res, 200, MESSAGES.TOKEN_REFRESH_SUCCESS, { accessToken });
     } catch (error) {
       return next(error);
     }
@@ -44,7 +67,7 @@ class AuthController {
     try {
       const { email } = req.body;
       const result = await authService.forgotPassword(email);
-      return successResponse(res, 200, 'Forgot password endpoint (Skeleton)', result);
+      return successResponse(res, 200, MESSAGES.PASSWORD_RESET_EMAIL_SENT, result);
     } catch (error) {
       return next(error);
     }
@@ -55,7 +78,7 @@ class AuthController {
       const { token } = req.params;
       const { password } = req.body;
       const result = await authService.resetPassword(token, password);
-      return successResponse(res, 200, 'Reset password endpoint (Skeleton)', result);
+      return successResponse(res, 200, result.message);
     } catch (error) {
       return next(error);
     }
@@ -64,8 +87,9 @@ class AuthController {
   googleLogin = async (req, res, next) => {
     try {
       const { token } = req.body;
-      const result = await authService.googleLogin(token);
-      return successResponse(res, 200, 'Google login endpoint (Skeleton)', result);
+      const { user, accessToken, refreshToken } = await authService.googleLogin(token);
+      this.#setRefreshTokenCookie(res, refreshToken);
+      return successResponse(res, 200, MESSAGES.LOGIN_SUCCESS, { user, accessToken });
     } catch (error) {
       return next(error);
     }
@@ -73,9 +97,8 @@ class AuthController {
 
   getCurrentUser = async (req, res, next) => {
     try {
-      return successResponse(res, 200, 'Get current user endpoint (Skeleton)', {
-        user: req.user || null,
-      });
+      // req.user is already populated with the full user object in the real authenticate middleware
+      return successResponse(res, 200, 'User profile retrieved successfully', { user: req.user });
     } catch (error) {
       return next(error);
     }
