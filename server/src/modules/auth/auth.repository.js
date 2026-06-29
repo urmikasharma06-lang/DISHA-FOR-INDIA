@@ -38,6 +38,15 @@ class AuthRepository {
   }
 
   /**
+   * Find a user by their refresh token.
+   * @param {string} token - The refresh token.
+   * @returns {Promise<User|null>} The user document.
+   */
+  async findByRefreshToken(token) {
+    return User.findOne({ refreshToken: token }).select('+refreshToken');
+  }
+
+  /**
    * Create a new user.
    * @param {object} userData - User data.
    * @returns {Promise<User>} The created user document.
@@ -60,7 +69,34 @@ class AuthRepository {
   }
 
   /**
-   * Delete a user (soft or hard, here we do hard delete).
+   * Update the refresh token for a user.
+   * @param {string} id - User ID.
+   * @param {string} token - The new refresh token.
+   * @returns {Promise<User|null>} The updated user document.
+   */
+  async updateRefreshToken(id, token) {
+    return User.findByIdAndUpdate(
+      id,
+      { refreshToken: token },
+      { new: true, runValidators: true }
+    ).select('+refreshToken');
+  }
+
+  /**
+   * Remove the refresh token for a user.
+   * @param {string} id - User ID.
+   * @returns {Promise<User|null>} The updated user document.
+   */
+  async removeRefreshToken(id) {
+    return User.findByIdAndUpdate(
+      id,
+      { refreshToken: null },
+      { new: true, runValidators: true }
+    ).select('+refreshToken');
+  }
+
+  /**
+   * Delete a user.
    * @param {string} id - User ID.
    * @returns {Promise<User|null>} The deleted user document.
    */

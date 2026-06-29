@@ -1,7 +1,7 @@
-const { AuthenticationError, AuthorizationError } = require('../utils/errors');
-const jwtUtils = require('../utils/jwt');
-const User = require('../modules/user/user.model');
 const { STATUS } = require('../modules/user/user.constants');
+const User = require('../modules/user/user.model');
+const { AuthenticationError } = require('../utils/errors');
+const jwtUtils = require('../utils/jwt');
 
 /**
  * Authentication middleware.
@@ -35,7 +35,7 @@ const authenticate = async (req, res, next) => {
       return next(new AuthenticationError('User belonging to this token no longer exists.'));
     }
 
-    // Check if user is active
+    // Check if user is active/suspended
     if (user.status === STATUS.SUSPENDED) {
       return next(
         new AuthenticationError('Your account has been suspended. Please contact support.')
@@ -51,53 +51,19 @@ const authenticate = async (req, res, next) => {
 };
 
 /**
- * Authorization middleware.
- * Restricts access to specific roles.
- * @param {...string} roles - The allowed roles.
+ * Authorization middleware skeleton (not used in Module 2.3, but kept for future use).
  */
-const authorize = (...roles) => {
+const authorize = (..._roles) => {
   return (req, res, next) => {
-    if (!req.user) {
-      return next(new AuthenticationError('Authentication required.'));
-    }
-
-    if (!roles.includes(req.user.role)) {
-      return next(new AuthorizationError('You do not have permission to perform this action.'));
-    }
-
     return next();
   };
 };
 
 /**
- * Optional authentication middleware.
- * Populates req.user if a valid token is present, but does not block if not.
+ * Optional authentication middleware skeleton.
  */
 const optionalAuth = async (req, res, next) => {
-  try {
-    let token = null;
-
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      token = authHeader.split(' ')[1];
-    }
-
-    if (!token) {
-      return next();
-    }
-
-    const decoded = jwtUtils.verifyAccessToken(token);
-    const user = await User.findById(decoded.id);
-
-    if (user && user.status !== STATUS.SUSPENDED) {
-      req.user = user;
-    }
-
-    return next();
-  } catch (_error) {
-    // Fail silently for optional authentication
-    return next();
-  }
+  return next();
 };
 
 module.exports = {
