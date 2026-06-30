@@ -6,13 +6,20 @@ const validateRegister = require('./register.validation');
 const validateResetPassword = require('./resetPassword.validation');
 const { authenticate } = require('../../middlewares/auth.middleware');
 const { isAdmin, isVolunteer, isAdminOrVolunteer } = require('../../middlewares/rbac.middleware');
+const { authLimiter, forgotPasswordLimiter } = require('../../config/rateLimiter.config');
 
 const router = express.Router();
 
-router.post('/register', validateRegister, authController.register);
-router.post('/login', validateLogin, authController.login);
+// Public routes with rate limiting
+router.post('/register', authLimiter, validateRegister, authController.register);
+router.post('/login', authLimiter, validateLogin, authController.login);
 router.post('/refresh-token', authController.refreshToken);
-router.post('/forgot-password', validateForgotPassword, authController.forgotPassword);
+router.post(
+  '/forgot-password',
+  forgotPasswordLimiter,
+  validateForgotPassword,
+  authController.forgotPassword
+);
 router.post('/reset-password/:token', validateResetPassword, authController.resetPassword);
 
 // Google OAuth routes
@@ -23,7 +30,7 @@ router.get('/google/callback', authController.googleCallback);
 router.post('/logout', authenticate, authController.logout);
 router.get('/me', authenticate, authController.getCurrentUser);
 
-// RBAC Demonstration & Verification test routes
+// RBAC Demonstration routes
 router.get('/test/public-blogs', (req, res) => {
   return res.status(200).json({ success: true, message: 'Public blogs accessed successfully.' });
 });

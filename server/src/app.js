@@ -2,74 +2,90 @@ const compression = require('compression');
 const cookieParser = require('cookie-parser');
 const cors = require('cors');
 const express = require('express');
-const { rateLimit } = require('express-rate-limit');
 const helmet = require('helmet');
 const passport = require('passport');
 
-require('./config/passport'); // Load passport configuration
+require('./config/passport'); // Load Passport Google OAuth strategy
+const getCorsConfig = require('./config/cors.config');
+const helmetConfig = require('./config/helmet.config');
+const getMorganMiddleware = require('./config/morgan.config');
+const { globalLimiter } = require('./config/rateLimiter.config');
 const errorHandler = require('./middlewares/error.middleware');
+const notFoundHandler = require('./middlewares/notFound.middleware');
 const authRoutes = require('./modules/auth/auth.routes');
-const NotFoundError = require('./utils/errors/NotFoundError');
 const { successResponse } = require('./utils/response');
 
 const app = express();
 
-// Set security HTTP headers
-app.use(helmet());
+// ─────────────────────────────────────────────
+// 1. Security Headers (Helmet)
+// ─────────────────────────────────────────────
+app.use(helmet(helmetConfig));
 
-// Enable CORS
-app.use(
-  cors({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
-    credentials: true,
-  })
-);
+// ─────────────────────────────────────────────
+// 2. CORS
+// ─────────────────────────────────────────────
+app.use(cors(getCorsConfig()));
+app.options('/{*splat}', cors(getCorsConfig())); // Handle pre-flight requests for all routes
 
-// Gzip compression
-app.use(compression());
+// ─────────────────────────────────────────────
+// 3. HTTP Request Logging (Morgan)
+// ─────────────────────────────────────────────
+app.use(getMorganMiddleware());
 
-// Parse incoming requests with JSON payloads
+// ─────────────────────────────────────────────
+// 4. Body Parsing (with request size limits)
+// ─────────────────────────────────────────────
 app.use(express.json({ limit: '10kb' }));
-
-// Parse incoming requests with urlencoded payloads
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
-// Parse Cookie header and populate req.cookies
+// ─────────────────────────────────────────────
+// 5. Cookie Parsing
+// ─────────────────────────────────────────────
 app.use(cookieParser());
 
-// Initialize Passport
+// ─────────────────────────────────────────────
+// 6. Gzip Compression
+// ─────────────────────────────────────────────
+app.use(compression());
+
+// ─────────────────────────────────────────────
+// 7. Passport Initialization
+// ─────────────────────────────────────────────
 app.use(passport.initialize());
 
-// Rate Limiting for API endpoints
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  limit: 100, // Limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again after 15 minutes',
-  standardHeaders: 'draft-7',
-  legacyHeaders: false,
-});
-
+// ─────────────────────────────────────────────
+// 8. Global Rate Limiter (Production only)
+// ─────────────────────────────────────────────
 if (process.env.NODE_ENV === 'production') {
-  app.use('/api', apiLimiter);
+  app.use('/api', globalLimiter);
 }
 
-// Health Check Route
-app.get('/health', (req, res) => {
+// ─────────────────────────────────────────────
+// 9. Health Check
+// ─────────────────────────────────────────────
+app.get('/api/v1/health', (req, res) => {
   return successResponse(res, 200, 'Server is healthy', {
-    uptime: process.uptime(),
-    timestamp: new Date(),
+    status: 'UP',
+    uptime: `${Math.floor(process.uptime())}s`,
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
   });
 });
 
-// API Routes
+// ─────────────────────────────────────────────
+// 10. API Routes
+// ─────────────────────────────────────────────
 app.use('/api/v1/auth', authRoutes);
 
-// Handle 404 Not Found
-app.use((req, res, next) => {
-  next(new NotFoundError(`Route ${req.method} ${req.originalUrl} not found`));
-});
+// ─────────────────────────────────────────────
+// 11. 404 Handler (must be after all routes)
+// ─────────────────────────────────────────────
+app.use(notFoundHandler);
 
-// Global Error Handler
+// ─────────────────────────────────────────────
+// 12. Global Error Handler (must be last)
+// ─────────────────────────────────────────────
 app.use(errorHandler);
 
 module.exports = app;

@@ -162,12 +162,10 @@ const userSchema = new mongoose.Schema(
   }
 );
 
-// Indexes for optimized searching
-userSchema.index({ email: 1 });
-userSchema.index({ username: 1 });
-userSchema.index({ volunteerId: 1 });
+// Additional indexes (email, username, volunteerId already indexed via unique: true)
 userSchema.index({ role: 1 });
 userSchema.index({ status: 1 });
+userSchema.index({ googleId: 1 }, { sparse: true });
 
 // Method to remove sensitive fields when converting to JSON
 userSchema.set('toJSON', {
