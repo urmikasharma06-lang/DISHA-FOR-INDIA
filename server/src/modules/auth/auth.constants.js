@@ -16,6 +16,11 @@ const MESSAGES = {
   FORBIDDEN: 'Access forbidden. You do not have the required permissions.',
   EMAIL_ALREADY_EXISTS: 'Email is already registered.',
   USERNAME_ALREADY_EXISTS: 'Username is already taken.',
+  MISSING_TOKEN: 'Access token is missing. Please log in.',
+  INVALID_TOKEN: 'Invalid or expired access token. Please log in again.',
+  USER_NOT_FOUND: 'User belonging to this token no longer exists.',
+  BLOCKED_USER: 'Your account has been suspended. Please contact support.',
+  DELETED_USER: 'Your account has been deactivated or deleted.',
 };
 
 const HTTP_STATUS = {
@@ -36,9 +41,15 @@ const COOKIE_OPTIONS = {
   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days (matches refresh token expiry)
 };
 
+const HEADERS = {
+  AUTH_HEADER: 'authorization',
+  BEARER_PREFIX: 'Bearer ',
+};
+
 module.exports = {
   TOKEN_TYPES,
   MESSAGES,
   HTTP_STATUS,
   COOKIE_OPTIONS,
+  HEADERS,
 };

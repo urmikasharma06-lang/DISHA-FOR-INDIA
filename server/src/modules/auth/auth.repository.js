@@ -197,6 +197,16 @@ class AuthRepository {
   }
 
   /**
+   * Find a user by ID and ensure they are active (not suspended).
+   * @param {string} id - User ID.
+   * @returns {Promise<User|null>} The user document.
+   */
+  async findActiveUser(id) {
+    const { STATUS } = require('../user/user.constants');
+    return User.findOne({ _id: id, status: { $ne: STATUS.SUSPENDED } }).select('+refreshToken');
+  }
+
+  /**
    * Delete a user.
    * @param {string} id - User ID.
    * @returns {Promise<User|null>} The deleted user document.

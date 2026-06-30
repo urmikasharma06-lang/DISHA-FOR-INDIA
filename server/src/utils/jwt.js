@@ -40,9 +40,19 @@ const verifyRefreshToken = (token) => {
   return jwt.verify(token, process.env.JWT_REFRESH_SECRET);
 };
 
+/**
+ * Decode a JWT token without verifying the signature.
+ * @param {string} token - The token to decode.
+ * @returns {object|null} The decoded token payload.
+ */
+const decodeToken = (token) => {
+  return jwt.decode(token);
+};
+
 module.exports = {
   generateAccessToken,
   generateRefreshToken,
   verifyAccessToken,
   verifyRefreshToken,
+  decodeToken,
 };
