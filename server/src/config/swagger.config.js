@@ -303,6 +303,10 @@ Most endpoints require a **JWT Bearer Token**.
         description: 'Authentication & Session Management',
       },
       {
+        name: 'Users',
+        description: 'User Management & Profiles',
+      },
+      {
         name: 'Health',
         description: 'Server health monitoring',
       },
@@ -313,6 +317,7 @@ Most endpoints require a **JWT Bearer Token**.
     './src/modules/auth/auth.routes.js',
     './src/docs/auth.docs.js',
     './src/docs/health.docs.js',
+    './src/docs/user.docs.js',
   ],
 };
 
