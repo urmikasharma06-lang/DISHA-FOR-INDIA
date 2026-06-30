@@ -47,6 +47,18 @@ class AuthRepository {
   }
 
   /**
+   * Find a user by their hashed password reset token if it hasn't expired.
+   * @param {string} token - The hashed reset token.
+   * @returns {Promise<User|null>} The user document.
+   */
+  async findByResetToken(token) {
+    return User.findOne({
+      passwordResetToken: token,
+      passwordResetExpires: { $gt: Date.now() },
+    });
+  }
+
+  /**
    * Create a new user.
    * @param {object} userData - User data.
    * @returns {Promise<User>} The created user document.
@@ -93,6 +105,59 @@ class AuthRepository {
       { refreshToken: null },
       { new: true, runValidators: true }
     ).select('+refreshToken');
+  }
+
+  /**
+   * Save the password reset token and its expiration.
+   * @param {string} id - User ID.
+   * @param {string} hashedToken - The hashed reset token.
+   * @param {Date} expires - Expiration time.
+   * @returns {Promise<User|null>} The updated user document.
+   */
+  async saveResetToken(id, hashedToken, expires) {
+    return User.findByIdAndUpdate(
+      id,
+      {
+        passwordResetToken: hashedToken,
+        passwordResetExpires: expires,
+      },
+      { new: true, runValidators: true }
+    );
+  }
+
+  /**
+   * Clear the password reset token and its expiration from a user.
+   * @param {string} id - User ID.
+   * @returns {Promise<User|null>} The updated user document.
+   */
+  async clearResetToken(id) {
+    return User.findByIdAndUpdate(
+      id,
+      {
+        passwordResetToken: null,
+        passwordResetExpires: null,
+      },
+      { new: true, runValidators: true }
+    );
+  }
+
+  /**
+   * Update user password and clear reset/refresh token fields (forces logout).
+   * @param {string} id - User ID.
+   * @param {string} hashedPassword - The hashed password.
+   * @returns {Promise<User|null>} The updated user document.
+   */
+  async updatePassword(id, hashedPassword) {
+    return User.findByIdAndUpdate(
+      id,
+      {
+        password: hashedPassword,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+        refreshToken: null,
+      },
+      { new: true, runValidators: true }
+    );
   }
 
   /**

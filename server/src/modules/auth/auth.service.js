@@ -1,9 +1,16 @@
 const authRepository = require('./auth.repository');
 const { MESSAGES } = require('./auth.constants');
 const { STATUS, ROLES } = require('../user/user.constants');
-const { ConflictError, AuthenticationError, NotFoundError } = require('../../utils/errors');
+const emailService = require('../../services/email.service');
+const {
+  ConflictError,
+  AuthenticationError,
+  NotFoundError,
+  ValidationError,
+} = require('../../utils/errors');
 const jwtUtils = require('../../utils/jwt');
 const passwordUtils = require('../../utils/password');
+const tokenUtils = require('../../utils/token');
 const { generateVolunteerId } = require('../../utils/volunteerId');
 
 class AuthService {
@@ -154,6 +161,72 @@ class AuthService {
       throw new NotFoundError('User not found');
     }
     return user;
+  }
+
+  /**
+   * Handle Forgot Password flow.
+   * Generates reset token, saves hashed version, and triggers password reset email.
+   * @param {string} email - User email.
+   * @returns {Promise<object>} Generic success response.
+   */
+  async forgotPassword(email) {
+    const user = await authRepository.findByEmail(email);
+
+    if (user) {
+      // Generate random secure token
+      const resetToken = tokenUtils.generatePasswordResetToken();
+      // Hash the token before storing
+      const hashedToken = tokenUtils.hashPasswordResetToken(resetToken);
+      // Expiration time set to 10 minutes from now
+      const expires = new Date(Date.now() + 10 * 60 * 1000);
+
+      // Save hashed token and expiration
+      await authRepository.saveResetToken(user._id, hashedToken, expires);
+
+      // Create reset URL link
+      const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password/${resetToken}`;
+
+      // Send password reset email
+      await emailService.sendPasswordResetEmail({
+        email: user.email,
+        name: user.name,
+        resetUrl,
+        expireMinutes: 10,
+      });
+    }
+
+    // Return generic message regardless of email existence to prevent user enumeration
+    return {
+      message: MESSAGES.PASSWORD_RESET_EMAIL_SENT,
+    };
+  }
+
+  /**
+   * Handle Reset Password flow.
+   * Verifies the token, hashes and saves the new password, and clears reset and refresh tokens.
+   * @param {string} token - The raw reset token.
+   * @param {string} newPassword - The new password to set.
+   * @returns {Promise<object>} Success status response.
+   */
+  async resetPassword(token, newPassword) {
+    // Hash the token to match against stored hash
+    const hashedToken = tokenUtils.hashPasswordResetToken(token);
+
+    // Find user by reset token that is valid and not expired
+    const user = await authRepository.findByResetToken(hashedToken);
+    if (!user) {
+      throw new ValidationError('Password reset token is invalid or has expired');
+    }
+
+    // Hash the new password
+    const hashedPassword = await passwordUtils.hashPassword(newPassword);
+
+    // Update the password and clear reset fields (also revokes refresh token forcing all-session logout)
+    await authRepository.updatePassword(user._id, hashedPassword);
+
+    return {
+      message: MESSAGES.PASSWORD_RESET_SUCCESS,
+    };
   }
 }
 
