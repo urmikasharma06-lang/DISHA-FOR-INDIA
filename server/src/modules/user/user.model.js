@@ -3,6 +3,7 @@ const { ROLES, STATUS } = require('./user.constants');
 
 const userSchema = new mongoose.Schema(
   {
+    // Authentication & System Fields
     volunteerId: {
       type: String,
       unique: true,
@@ -41,11 +42,6 @@ const userSchema = new mongoose.Schema(
       minlength: [8, 'Password must be at least 8 characters'],
       select: false, // Don't return password by default
     },
-    phone: {
-      type: String,
-      trim: true,
-      match: [/^\+?[1-9]\d{1,14}$/, 'Please fill a valid phone number'],
-    },
     role: {
       type: String,
       enum: Object.values(ROLES),
@@ -56,15 +52,22 @@ const userSchema = new mongoose.Schema(
       enum: Object.values(STATUS),
       default: STATUS.PENDING,
     },
-    profilePhoto: {
-      type: String,
-      default: '',
-    },
-    about: {
+
+    // Basic Information
+    phone: {
       type: String,
       trim: true,
-      maxlength: [500, 'About section cannot exceed 500 characters'],
+      match: [/^\+?[1-9]\d{1,14}$/, 'Please fill a valid phone number'],
     },
+    gender: {
+      type: String,
+      enum: ['male', 'female', 'other', 'prefer_not_to_say'],
+    },
+    dateOfBirth: {
+      type: Date,
+    },
+
+    // Education
     college: {
       type: String,
       trim: true,
@@ -73,6 +76,15 @@ const userSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    graduationYear: {
+      type: Number,
+    },
+    educationLevel: {
+      type: String,
+      trim: true,
+    },
+
+    // Location
     city: {
       type: String,
       trim: true,
@@ -80,6 +92,22 @@ const userSchema = new mongoose.Schema(
     state: {
       type: String,
       trim: true,
+    },
+    country: {
+      type: String,
+      trim: true,
+      default: 'India',
+    },
+
+    // Volunteer Profile
+    profilePhoto: {
+      type: String,
+      default: '',
+    },
+    about: {
+      type: String,
+      trim: true,
+      maxlength: [500, 'About section cannot exceed 500 characters'],
     },
     languages: [
       {
@@ -117,6 +145,8 @@ const userSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+
+    // Volunteer Statistics
     points: {
       type: Number,
       default: 0,
@@ -132,6 +162,14 @@ const userSchema = new mongoose.Schema(
       default: 0,
       min: [0, 'Programs completed cannot be negative'],
     },
+    profileCompletion: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 100,
+    },
+
+    // Integration & Token Fields
     googleId: {
       type: String,
       unique: true,
@@ -172,6 +210,8 @@ userSchema.set('toJSON', {
   transform: function (doc, ret) {
     delete ret.password;
     delete ret.refreshToken;
+    delete ret.passwordResetToken;
+    delete ret.passwordResetExpires;
     delete ret.__v;
     return ret;
   },

@@ -241,6 +241,36 @@ Most endpoints require a **JWT Bearer Token**.
           },
         },
 
+        // ─── User Module Request Bodies ──────────────────────────
+        UpdateProfileRequest: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', minLength: 2, maxLength: 100, example: 'Arjun Mehta' },
+            username: { type: 'string', minLength: 3, maxLength: 30, example: 'arjun_mehta' },
+            phone: { type: 'string', example: '+919876543210' },
+            gender: {
+              type: 'string',
+              enum: ['male', 'female', 'other', 'prefer_not_to_say'],
+              example: 'male',
+            },
+            dateOfBirth: { type: 'string', format: 'date', example: '2000-04-15' },
+            college: { type: 'string', example: 'IIT Delhi' },
+            course: { type: 'string', example: 'B.Tech Computer Science' },
+            graduationYear: { type: 'integer', example: 2022 },
+            educationLevel: { type: 'string', example: 'Graduate' },
+            city: { type: 'string', example: 'New Delhi' },
+            state: { type: 'string', example: 'Delhi' },
+            country: { type: 'string', example: 'India' },
+            about: { type: 'string', maxLength: 500, example: 'Passionate about social impact.' },
+            skills: { type: 'array', items: { type: 'string' }, example: ['Teaching', 'React'] },
+            languages: { type: 'array', items: { type: 'string' }, example: ['English', 'Hindi'] },
+            interests: { type: 'array', items: { type: 'string' }, example: ['Education'] },
+            availability: { type: 'array', items: { type: 'string' }, example: ['Weekends'] },
+            linkedin: { type: 'string', example: 'https://linkedin.com/in/arjunmehta' },
+            portfolio: { type: 'string', example: 'https://arjunmehta.dev' },
+          },
+        },
+
         // ─── Responses ───────────────────────────────────────────
         SuccessResponse: {
           type: 'object',
