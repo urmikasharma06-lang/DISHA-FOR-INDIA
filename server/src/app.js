@@ -3,6 +3,7 @@ const cookieParser = require('cookie-parser');
 const cors = require('cors');
 const express = require('express');
 const helmet = require('helmet');
+const path = require('path');
 const passport = require('passport');
 const swaggerUi = require('swagger-ui-express');
 

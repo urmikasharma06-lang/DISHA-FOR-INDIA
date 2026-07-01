@@ -8,7 +8,8 @@ class ApplicationController {
       const result = await applicationService.applyToProgram(
         req.user.id,
         req.body.programId,
-        req.body.answers
+        req.body.answers,
+        req.files
       );
       return successResponse(res, 201, MESSAGES.APPLICATION_CREATED, result);
     } catch (error) {
@@ -70,6 +71,23 @@ class ApplicationController {
       const { ids, status } = req.body;
       const result = await applicationService.bulkUpdateApplications(req.user.id, ids, status);
       return successResponse(res, 200, 'Bulk update completed successfully', result);
+    } catch (error) {
+      return next(error);
+    }
+  };
+
+  exportApplications = async (req, res, next) => {
+    try {
+      const { format, ...filters } = req.query;
+      const exportResult = await applicationService.exportApplications(filters, format);
+      // Build filename: disha_applications_YYYY-MM-DD_HH-mm.<ext>
+      const now = new Date();
+      const pad = (n) => n.toString().padStart(2, '0');
+      const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}`;
+      const filename = `disha_applications_${timestamp}.${exportResult.extension}`;
+      res.setHeader('Content-Type', exportResult.contentType);
+      res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+      return res.send(exportResult.data);
     } catch (error) {
       return next(error);
     }

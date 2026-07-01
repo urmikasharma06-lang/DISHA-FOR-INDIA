@@ -2,12 +2,24 @@ const ValidationError = require('../../utils/errors/ValidationError');
 const { APPLICATION_STATUS } = require('./application.constants');
 
 const validateApplyToProgram = (req, res, next) => {
-  const { programId, answers } = req.body;
+  const { programId, answers, emergencyContactName, emergencyContactPhone, medicalConditions, backgroundCheckConsent, codeOfConductAgreement, mediaConsent, termsAccepted, privacyAccepted } = req.body;
   const errors = [];
 
   if (!programId || typeof programId !== 'string' || programId.trim() === '') {
     errors.push({ field: 'programId', message: 'Program ID is required' });
   }
+
+  // Required agreement fields must be true
+  if (codeOfConductAgreement !== true) {
+    errors.push({ field: 'codeOfConductAgreement', message: 'Code of Conduct must be accepted' });
+  }
+  if (termsAccepted !== true) {
+    errors.push({ field: 'termsAccepted', message: 'Terms must be accepted' });
+  }
+  if (privacyAccepted !== true) {
+    errors.push({ field: 'privacyAccepted', message: 'Privacy policy must be accepted' });
+  }
+
 
   if (answers !== undefined) {
     if (typeof answers !== 'object' || answers === null || Array.isArray(answers)) {

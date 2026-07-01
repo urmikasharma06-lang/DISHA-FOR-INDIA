@@ -33,9 +33,9 @@ const programSchema = new mongoose.Schema(
       maxlength: [10000, 'Description cannot exceed 10000 characters'],
     },
     category: {
-      type: String,
-      trim: true,
-      maxlength: [50, 'Category cannot exceed 50 characters'],
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Category',
+      required: [true, 'Category is required'],
     },
     tags: [
       {

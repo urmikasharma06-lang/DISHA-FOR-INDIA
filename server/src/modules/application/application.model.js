@@ -23,6 +23,23 @@ const applicationSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.Mixed,
       default: {},
     },
+    // ------------------- Custom Fields -------------------
+    emergencyContactName: { type: String, required: false },
+    emergencyContactPhone: { type: String, required: false },
+    medicalConditions: { type: String, required: false },
+    backgroundCheckConsent: { type: Boolean, default: false },
+    codeOfConductAgreement: { type: Boolean, required: true },
+    mediaConsent: { type: Boolean, default: false },
+    termsAccepted: { type: Boolean, required: true },
+    privacyAccepted: { type: Boolean, required: true },
+    // ---------------------------------------------------
+    documents: [{
+      url: { type: String, required: true },
+      key: { type: String },
+      originalName: { type: String },
+      mimeType: { type: String },
+      size: { type: Number }
+    }],
     status: {
       type: String,
       enum: Object.values(APPLICATION_STATUS),
