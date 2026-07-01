@@ -19,35 +19,35 @@ class AttendanceRepository {
    * Find an attendance record by its custom attendanceId.
    */
   async findByAttendanceId(attendanceId) {
-    return Attendance.findOne({ attendanceId });
+    return Attendance.findOne({ attendanceId, isDeleted: false });
   }
 
   /**
    * Find attendance records by application ID.
    */
   async findByApplication(applicationId) {
-    return Attendance.find({ application: applicationId });
+    return Attendance.find({ application: applicationId, isDeleted: false });
   }
 
   /**
    * Find attendance records by program ID.
    */
   async findByProgram(programId) {
-    return Attendance.find({ program: programId });
+    return Attendance.find({ program: programId, isDeleted: false });
   }
 
   /**
    * Find attendance records by volunteer ID.
    */
   async findByVolunteer(userId) {
-    return Attendance.find({ user: userId });
+    return Attendance.find({ user: userId, isDeleted: false });
   }
 
   /**
    * Find attendance records by date.
    */
   async findByDate(date) {
-    return Attendance.find({ attendanceDate: date });
+    return Attendance.find({ attendanceDate: date, isDeleted: false });
   }
 
   /**
@@ -70,6 +70,49 @@ class AttendanceRepository {
       },
       { new: true }
     );
+  }
+
+  // ─── Module 6.2 Specific Methods ─────────────────────────────────
+
+  /**
+   * Perform volunteer check-in (saves the record).
+   */
+  async checkIn(attendanceData) {
+    return this.create(attendanceData);
+  }
+
+  /**
+   * Perform volunteer check-out by updating checkout fields.
+   */
+  async checkOut(id, checkOutTime, totalHours) {
+    return this.update(id, { checkOutTime, totalHours });
+  }
+
+  /**
+   * Find today's attendance record for a volunteer in a program.
+   * Compares the normalized date (midnight UTC).
+   */
+  async findTodayAttendance(userId, programId, date) {
+    return Attendance.findOne({
+      user: userId,
+      program: programId,
+      attendanceDate: date,
+      isDeleted: false,
+    });
+  }
+
+  /**
+   * Find all attendance records for a volunteer.
+   */
+  async findVolunteerAttendance(userId) {
+    return this.findByVolunteer(userId);
+  }
+
+  /**
+   * Update attendance data.
+   */
+  async updateAttendance(id, updateData) {
+    return this.update(id, updateData);
   }
 }
 

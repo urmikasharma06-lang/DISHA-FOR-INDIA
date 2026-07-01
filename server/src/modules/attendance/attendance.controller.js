@@ -1,4 +1,5 @@
 const attendanceService = require('./attendance.service');
+const { MESSAGES } = require('./attendance.constants');
 const { successResponse } = require('../../utils/response');
 
 class AttendanceController {
@@ -9,7 +10,7 @@ class AttendanceController {
   checkIn = async (req, res, next) => {
     try {
       const result = await attendanceService.checkIn(req.user.id, req.body.applicationId);
-      return successResponse(res, 201, 'Check-in skeleton', result);
+      return successResponse(res, 201, MESSAGES.CHECK_IN_SUCCESS, result);
     } catch (error) {
       return next(error);
     }
@@ -22,7 +23,7 @@ class AttendanceController {
   checkOut = async (req, res, next) => {
     try {
       const result = await attendanceService.checkOut(req.body.attendanceId, req.user.id);
-      return successResponse(res, 200, 'Check-out skeleton', result);
+      return successResponse(res, 200, MESSAGES.CHECK_OUT_SUCCESS, result);
     } catch (error) {
       return next(error);
     }
@@ -38,7 +39,7 @@ class AttendanceController {
         id: req.params.id,
         ...req.body,
       });
-      return successResponse(res, 200, 'Mark attendance skeleton', result);
+      return successResponse(res, 200, MESSAGES.ATTENDANCE_MARKED, result);
     } catch (error) {
       return next(error);
     }
@@ -51,7 +52,7 @@ class AttendanceController {
   getMyAttendance = async (req, res, next) => {
     try {
       const result = await attendanceService.getMyAttendance(req.user.id, req.query);
-      return successResponse(res, 200, 'Get my attendance skeleton', result);
+      return successResponse(res, 200, MESSAGES.ATTENDANCE_LIST_FETCHED, result);
     } catch (error) {
       return next(error);
     }
@@ -64,7 +65,7 @@ class AttendanceController {
   attendanceHistory = async (req, res, next) => {
     try {
       const result = await attendanceService.attendanceHistory(req.query);
-      return successResponse(res, 200, 'Attendance history skeleton', result);
+      return successResponse(res, 200, MESSAGES.ATTENDANCE_LIST_FETCHED, result);
     } catch (error) {
       return next(error);
     }
@@ -77,7 +78,7 @@ class AttendanceController {
   getAttendance = async (req, res, next) => {
     try {
       const result = await attendanceService.getAttendance(req.params.id);
-      return successResponse(res, 200, 'Get attendance skeleton', result);
+      return successResponse(res, 200, MESSAGES.ATTENDANCE_FETCHED, result);
     } catch (error) {
       return next(error);
     }

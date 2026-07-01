@@ -9,7 +9,7 @@ const {
   validateAttendanceHistory,
 } = require('./attendance.validation');
 const { authenticate } = require('../../middlewares/auth.middleware');
-const { authorize } = require('../../middlewares/rbac.middleware');
+const { authorize, isVolunteer } = require('../../middlewares/rbac.middleware');
 const ROLES = require('../../constants/roles.constants');
 
 const router = express.Router();
@@ -18,8 +18,8 @@ const router = express.Router();
 router.use(authenticate);
 
 // ─── Volunteer Routes ──────────────────────────────────────────────
-router.post('/check-in', validateCheckIn, attendanceController.checkIn);
-router.patch('/check-out', validateCheckOut, attendanceController.checkOut);
+router.post('/check-in', isVolunteer, validateCheckIn, attendanceController.checkIn);
+router.patch('/check-out', isVolunteer, validateCheckOut, attendanceController.checkOut);
 router.get('/me', validateMyAttendance, attendanceController.getMyAttendance);
 
 // ─── Admin / Coordinator Routes ────────────────────────────────────
