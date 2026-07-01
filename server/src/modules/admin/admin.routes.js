@@ -9,6 +9,7 @@ const {
 const { authenticate } = require('../../middlewares/auth.middleware');
 const { isAdmin } = require('../../middlewares/rbac.middleware');
 const applicationRoutes = require('./application.routes');
+const attendanceRoutes = require('./attendance.routes');
 
 const router = express.Router();
 
@@ -30,5 +31,8 @@ router.delete('/users/:id', validateUserId, adminController.deleteUser);
 
 // ─── Application Management ──────────────────────────────────────
 router.use('/', applicationRoutes);
+
+// ─── Attendance Management ───────────────────────────────────────
+router.use('/', attendanceRoutes);
 
 module.exports = router;

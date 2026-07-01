@@ -1,5 +1,8 @@
 const attendanceRepository = require('./attendance.repository');
 const applicationRepository = require('../application/application.repository');
+const Program = require('../program/program.model');
+const User = require('../user/user.model');
+const Attendance = require('./attendance.model');
 const { generateAttendanceId } = require('./attendance.utils');
 const { ATTENDANCE_STATUS } = require('./attendance.constants');
 const {
@@ -8,13 +11,78 @@ const {
   AuthorizationError,
   ConflictError,
 } = require('../../utils/errors');
+const ROLES = require('../../constants/roles.constants');
 
 class AttendanceService {
   /**
+   * Helper to build Mongoose query filters for attendance listings.
+   */
+  async _buildFilters(queryParams) {
+    const { program, volunteer, status, date, startDate, endDate, city, state, search } =
+      queryParams;
+    const query = { isDeleted: false };
+
+    if (program) query.program = program;
+    if (volunteer) query.user = volunteer;
+    if (status) query.status = status;
+
+    if (date) {
+      const targetDate = new Date(date);
+      targetDate.setUTCHours(0, 0, 0, 0);
+      query.attendanceDate = targetDate;
+    } else if (startDate || endDate) {
+      query.attendanceDate = {};
+      if (startDate) {
+        const start = new Date(startDate);
+        start.setUTCHours(0, 0, 0, 0);
+        query.attendanceDate.$gte = start;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setUTCHours(23, 59, 59, 999);
+        query.attendanceDate.$lte = end;
+      }
+    }
+
+    // Filter by Program Location (City/State)
+    const programQueries = { isDeleted: false };
+    let hasLocationFilter = false;
+    if (city) {
+      programQueries.city = { $regex: city, $options: 'i' };
+      hasLocationFilter = true;
+    }
+    if (state) {
+      programQueries.state = { $regex: state, $options: 'i' };
+      hasLocationFilter = true;
+    }
+
+    if (hasLocationFilter) {
+      const matchingPrograms = await Program.find(programQueries).select('_id');
+      const programIds = matchingPrograms.map((p) => p._id);
+      query.program = { $in: programIds };
+    }
+
+    // Search by User name/email or Program title
+    if (search) {
+      const [users, programs] = await Promise.all([
+        User.find({
+          $or: [
+            { name: { $regex: search, $options: 'i' } },
+            { email: { $regex: search, $options: 'i' } },
+          ],
+        }).select('_id'),
+        Program.find({ title: { $regex: search, $options: 'i' } }).select('_id'),
+      ]);
+      const userIds = users.map((u) => u._id);
+      const programIds = programs.map((p) => p._id);
+      query.$or = [{ user: { $in: userIds } }, { program: { $in: programIds } }];
+    }
+
+    return query;
+  }
+
+  /**
    * Calculate total hours between check-in and check-out.
-   * @param {Date|string} checkInTime
-   * @param {Date|string} checkOutTime
-   * @returns {number} Hours in decimal format (rounded to 2 decimal places)
    */
   calculateHours(checkInTime, checkOutTime) {
     const inTime = new Date(checkInTime);
@@ -31,9 +99,6 @@ class AttendanceService {
 
   /**
    * Validate if a volunteer is allowed to check in for a specific application/program.
-   * @param {string} userId - User ID
-   * @param {string} applicationId - Application ID
-   * @returns {Promise<object>} Object containing validated application and program
    */
   async validateAttendance(userId, applicationId) {
     const application = await applicationRepository.findById(applicationId);
@@ -41,13 +106,11 @@ class AttendanceService {
       throw new NotFoundError('Application not found');
     }
 
-    // Verify application belongs to volunteer
     const appUserId = application.user._id || application.user;
     if (appUserId.toString() !== userId.toString()) {
       throw new AuthorizationError('You are not authorized to check in for this application');
     }
 
-    // Verify application status is 'joined'
     if (application.status !== 'joined') {
       throw new ValidationError('You have not joined this program');
     }
@@ -57,7 +120,6 @@ class AttendanceService {
       throw new NotFoundError('Program not found');
     }
 
-    // Verify program is active/ongoing
     if (program.status !== 'ongoing') {
       throw new ValidationError('Check-in failed: Program is not currently ongoing');
     }
@@ -69,16 +131,13 @@ class AttendanceService {
    * Check in a volunteer for a specific program/application.
    */
   async checkIn(userId, applicationId) {
-    // 1. Validate application and program
     const { application, program } = await this.validateAttendance(userId, applicationId);
 
-    // 2. Normalize date to midnight UTC to check for duplicate check-ins today
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
 
     const programId = program._id || program;
 
-    // 3. Prevent duplicate check-in today
     const existingAttendance = await attendanceRepository.findTodayAttendance(
       userId,
       programId,
@@ -88,7 +147,6 @@ class AttendanceService {
       throw new ConflictError('You have already checked in for this program today');
     }
 
-    // 4. Create check-in record
     const attendanceId = generateAttendanceId();
     const checkInRecord = await attendanceRepository.checkIn({
       attendanceId,
@@ -108,29 +166,24 @@ class AttendanceService {
    * Check out a volunteer.
    */
   async checkOut(attendanceId, userId) {
-    // 1. Find attendance record
     const attendance = await attendanceRepository.findByAttendanceId(attendanceId);
     if (!attendance) {
       throw new NotFoundError('Attendance record not found');
     }
 
-    // 2. Verify record ownership
     const attUserId = attendance.user._id || attendance.user;
     if (attUserId.toString() !== userId.toString()) {
       throw new AuthorizationError('You are not authorized to check out for this attendance');
     }
 
-    // 3. Prevent duplicate check-out
     if (attendance.checkOutTime) {
       throw new ValidationError('You have already checked out for this attendance record');
     }
 
-    // 4. Calculate total hours
     const checkInTime = attendance.checkInTime;
     const checkOutTime = new Date();
     const totalHours = this.calculateHours(checkInTime, checkOutTime);
 
-    // 5. Update checkout fields
     const updatedRecord = await attendanceRepository.checkOut(
       attendance._id,
       checkOutTime,
@@ -140,35 +193,164 @@ class AttendanceService {
   }
 
   /**
-   * Manually mark attendance (Admin/Coordinator) - Skeleton.
+   * Get attendance for currently logged in volunteer.
    */
-  async markAttendance(adminId, data) {
-    return { adminId, data, message: 'Mark attendance skeleton' };
+  async getMyAttendance(userId, queryParams) {
+    const { page, limit, sortBy, sortOrder, program, startDate, endDate } = queryParams;
+    const filters = {};
+
+    if (program) filters.program = program;
+    if (startDate || endDate) {
+      filters.attendanceDate = {};
+      if (startDate) {
+        const start = new Date(startDate);
+        start.setUTCHours(0, 0, 0, 0);
+        filters.attendanceDate.$gte = start;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setUTCHours(23, 59, 59, 999);
+        filters.attendanceDate.$lte = end;
+      }
+    }
+
+    const result = await attendanceRepository.findMyAttendance(userId, filters, {
+      page: Number(page),
+      limit: Number(limit),
+      sortBy,
+      sortOrder,
+    });
+    return result;
   }
 
   /**
-   * Get details of a specific attendance record - Skeleton.
+   * Get attendance details. Volunteers can view only their own. Admins can view any.
    */
-  async getAttendance(attendanceId) {
-    const attendance = await attendanceRepository.findById(attendanceId);
+  async getAttendance(attendanceId, userId, userRole) {
+    const attendance = await attendanceRepository.findAttendanceById(attendanceId);
     if (!attendance) {
       throw new NotFoundError('Attendance record not found');
     }
+
+    const isAuthorized =
+      [ROLES.ADMIN, ROLES.SUPER_ADMIN, ROLES.COORDINATOR].includes(userRole) ||
+      attendance.user._id.toString() === userId.toString();
+
+    if (!isAuthorized) {
+      throw new AuthorizationError('You are not authorized to view this record');
+    }
+
     return attendance;
   }
 
   /**
-   * Get the attendance summary for the currently logged-in volunteer - Skeleton.
+   * Admin attendance listing.
    */
-  async getMyAttendance(userId, queryParams) {
-    return { userId, queryParams, message: 'Get my attendance skeleton' };
+  async getAdminAttendance(queryParams) {
+    const { page = 1, limit = 10, sortBy, sortOrder } = queryParams;
+    const filters = await this._buildFilters(queryParams);
+
+    const result = await attendanceRepository.findAdminAttendance(filters, {
+      page: Number(page),
+      limit: Number(limit),
+      sortBy,
+      sortOrder,
+    });
+    return result;
   }
 
   /**
-   * Get attendance history across the platform (Admin/Coordinator) - Skeleton.
+   * Edit attendance manually (Admin only).
    */
-  async attendanceHistory(queryParams) {
-    return { queryParams, message: 'Attendance history skeleton' };
+  async editAttendance(id, updateData, adminId) {
+    const attendance = await attendanceRepository.findById(id);
+    if (!attendance) {
+      throw new NotFoundError('Attendance record not found');
+    }
+
+    const updatedFields = { ...updateData, markedBy: adminId };
+
+    if (updateData.status === ATTENDANCE_STATUS.ABSENT) {
+      updatedFields.checkInTime = null;
+      updatedFields.checkOutTime = null;
+      updatedFields.totalHours = 0;
+    } else {
+      const inTime = updateData.checkInTime
+        ? new Date(updateData.checkInTime)
+        : attendance.checkInTime;
+      const outTime = updateData.checkOutTime
+        ? new Date(updateData.checkOutTime)
+        : attendance.checkOutTime;
+
+      if (inTime && outTime) {
+        updatedFields.totalHours = this.calculateHours(inTime, outTime);
+      }
+    }
+
+    const updated = await attendanceRepository.updateAttendance(id, updatedFields);
+    return updated;
+  }
+
+  /**
+   * Bulk mark/update attendance (Admin only).
+   */
+  async bulkAttendance(adminId, bulkData) {
+    const { ids, status, remarks } = bulkData;
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new ValidationError('A non-empty array of attendance IDs is required');
+    }
+
+    const updateData = { markedBy: adminId };
+    if (status) {
+      updateData.status = status;
+      if (status === ATTENDANCE_STATUS.ABSENT) {
+        updateData.totalHours = 0;
+        updateData.checkInTime = null;
+        updateData.checkOutTime = null;
+      }
+    }
+    if (remarks !== undefined) {
+      updateData.remarks = remarks;
+    }
+
+    await attendanceRepository.bulkUpdateAttendance(ids, updateData);
+    return { count: ids.length };
+  }
+
+  /**
+   * Get attendance statistics (Admin only).
+   */
+  async getStatistics() {
+    return attendanceRepository.getAttendanceStatistics();
+  }
+
+  /**
+   * Export attendance data in simplified format (Admin only).
+   */
+  async exportAttendance(queryParams) {
+    const filters = await this._buildFilters(queryParams);
+    const records = await Attendance.find(filters)
+      .populate('user', 'name email volunteerId')
+      .populate('program', 'title programId')
+      .sort({ attendanceDate: -1 });
+
+    const exportData = records.map((r) => ({
+      'Attendance ID': r.attendanceId,
+      'Attendance Date': r.attendanceDate ? r.attendanceDate.toISOString().split('T')[0] : 'N/A',
+      'Volunteer Name': r.user?.name || 'N/A',
+      'Volunteer Email': r.user?.email || 'N/A',
+      'Volunteer ID': r.user?.volunteerId || 'N/A',
+      'Program Title': r.program?.title || 'N/A',
+      'Program ID': r.program?.programId || 'N/A',
+      Status: r.status,
+      'Check-in Time': r.checkInTime ? r.checkInTime.toISOString() : 'N/A',
+      'Check-out Time': r.checkOutTime ? r.checkOutTime.toISOString() : 'N/A',
+      'Total Hours': r.totalHours,
+      Remarks: r.remarks || '',
+    }));
+
+    return exportData;
   }
 }
 
