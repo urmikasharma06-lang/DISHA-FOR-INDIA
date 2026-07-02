@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { VolunteerProvider } from './context/VolunteerContext';
 
 // Layouts
 import MainLayout from './layouts/MainLayout';
@@ -17,6 +18,22 @@ import Leaderboard from './pages/Leaderboard';
 import Certificates from './pages/Certificates';
 import ProfileSetup from './pages/ProfileSetup';
 import NotFound from './pages/NotFound';
+import Unauthorized from './pages/Unauthorized';
+
+// Volunteer Pages
+import ApplicationForm from './pages/applications/ApplicationForm';
+import MyApplications from './pages/applications/MyApplications';
+import ApplicationDetails from './pages/applications/ApplicationDetails';
+import MyPrograms from './pages/programs/MyPrograms';
+import AttendanceDashboard from './pages/attendance/AttendanceDashboard';
+import CheckIn from './pages/attendance/CheckIn';
+import CheckOut from './pages/attendance/CheckOut';
+import AttendanceHistory from './pages/attendance/AttendanceHistory';
+import VolunteerHours from './pages/attendance/VolunteerHours';
+
+// Admin Pages
+import AdminApplications from './pages/admin/AdminApplications';
+import AdminAttendance from './pages/admin/AdminAttendance';
 
 // ─── ROUTE GUARDS ─────────────────────────────────────────────
 
@@ -35,27 +52,28 @@ const ProtectedRoute = ({ children }) => {
         backgroundColor: 'var(--color-bg)'
       }}>
         {/* Loading Spinner */}
-        <div style={{
-          width: '48px',
-          height: '48px',
-          border: '4px solid var(--color-border)',
-          borderTopColor: 'var(--color-primary)',
-          borderRadius: '50%',
-          animation: 'spin 1s linear infinite',
-          marginBottom: '1rem'
-        }}></div>
+        <div className="spinner" style={{ marginBottom: '1rem' }}></div>
         <p style={{ fontWeight: 500, color: 'var(--color-body)' }}>Loading session...</p>
-        <style>{`
-          @keyframes spin {
-            to { transform: rotate(360deg); }
-          }
-        `}</style>
       </div>
     );
   }
 
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  return children;
+};
+
+// Guard: Require Admin Role
+const AdminRoute = ({ children }) => {
+  const { user, loading } = useAuth();
+
+  if (loading) return null;
+
+  // Assuming user object has a role property 'admin'
+  if (!user || user.role !== 'admin') {
+    return <Navigate to="/unauthorized" replace />;
   }
 
   return children;
@@ -107,18 +125,39 @@ function App() {
             />
           </Route>
 
+          <Route path="/unauthorized" element={<Unauthorized />} />
+
           {/* Dashboard / Volunteer Portal Routes (Protected) */}
           <Route
             path="/"
             element={
               <ProtectedRoute>
-                <DashboardLayout />
+                <VolunteerProvider>
+                  <DashboardLayout />
+                </VolunteerProvider>
               </ProtectedRoute>
             }
           >
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="certificates" element={<Certificates />} />
             <Route path="profile/setup" element={<ProfileSetup />} />
+            
+            {/* Volunteer Journey Routes */}
+            <Route path="applications" element={<MyApplications />} />
+            <Route path="applications/:id" element={<ApplicationDetails />} />
+            <Route path="programs/:programId/apply" element={<ApplicationForm />} />
+            <Route path="my-programs" element={<MyPrograms />} />
+            
+            {/* Attendance & Hours Routes */}
+            <Route path="attendance" element={<AttendanceDashboard />} />
+            <Route path="attendance/check-in" element={<CheckIn />} />
+            <Route path="attendance/checkout" element={<CheckOut />} />
+            <Route path="attendance/history" element={<AttendanceHistory />} />
+            <Route path="attendance/hours" element={<VolunteerHours />} />
+            
+            {/* Admin Routes */}
+            <Route path="admin/applications" element={<AdminRoute><AdminApplications /></AdminRoute>} />
+            <Route path="admin/attendance" element={<AdminRoute><AdminAttendance /></AdminRoute>} />
           </Route>
 
           {/* Catch-all 404 Route */}
